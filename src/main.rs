@@ -1,5 +1,8 @@
+use std::{io::Read, path::PathBuf, sync::Arc};
+
+use anyhow::{Ok, Result};
 use canvas_image::{canvas_image, CanvasImageData};
-use eframe::egui::{self};
+use eframe::egui::{self, Widget};
 use egui::emath::TSTransform;
 
 mod canvas_image;
@@ -17,7 +20,7 @@ fn main() -> eframe::Result {
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(app))
+            eframe::Result::Ok(Box::new(app))
         }),
     )
 }
@@ -27,6 +30,7 @@ struct App {
     transform: TSTransform,
     images: Vec<CanvasImageData>,
     dropped_images: Vec<String>,
+    dropped_bytes: Vec<Vec<u8>>,
 }
 
 #[allow(dead_code)]
@@ -39,19 +43,13 @@ impl App {
     fn new() -> Self {
         Self {
             transform: TSTransform::default(),
-            // images: vec![CanvasImageData::new()],
+            images: vec![CanvasImageData::new()],
             ..Default::default()
         }
     }
 
     fn manage_canvas_movement(&mut self, ui: &egui::Ui) {
-        // let a = UiBuilder
         let response = ui.interact_bg(egui::Sense::click_and_drag());
-        // let response = ui.response();
-        // let b = UiBuilder::new();
-
-        // b.
-        // let response = UiBuilder::sense(b, egui::Sense::click_and_drag());
 
         if response.dragged() {
             self.transform.translation += response.drag_delta();
@@ -93,15 +91,23 @@ impl App {
         ui.ctx().set_sublayer(parent_window, id);
     }
 
-    #[allow(dead_code)]
-    fn test_button(&self, ui: &egui::Ui, rect: egui::Rect, parent_window: egui::LayerId) {
-        let id = egui::Area::new(egui::Id::from("toggle"))
-            .default_pos(egui::pos2(0.0, 0.0))
+    fn add_floating_widget(
+        &self,
+        ui: &egui::Ui,
+        rect: egui::Rect,
+        parent_window: egui::LayerId,
+        widget: impl Widget,
+        count: usize,
+    ) {
+        use egui::Id;
+        let id = egui::Area::new(Id::new("floating_image").with(count))
+            // .default_pos()
             .order(egui::Order::Middle)
             .constrain(false)
             .show(ui.ctx(), |ui| {
                 ui.set_clip_rect(self.transform.inverse() * rect);
-                ui.add(toggle(&mut false));
+
+                ui.add(widget);
             })
             .response
             .layer_id;
@@ -146,16 +152,23 @@ impl App {
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
                 for file in &i.raw.dropped_files {
-                    if let Some(file_path) = &file.path {
-                        if ["jpg", "svg", "gif"]
-                            .iter()
-                            .any(|f| file_path.extension().unwrap().to_str().unwrap().eq(*f))
-                        {
-                            self.dropped_images.push(
-                                String::from("file://")
-                                    + &file_path.clone().into_os_string().into_string().unwrap(),
-                            );
-                        }
+                    // if let Some(file_path) = &file.path {
+                    //     if ["jpg", "svg", "gif"]
+                    //         .iter()
+                    //         .any(|f| file_path.extension().unwrap().to_str().unwrap().eq(*f))
+                    //     {
+                    //         self.dropped_images.push(
+                    //             String::from("file://")
+                    //                 + &file_path.clone().into_os_string().into_string().unwrap(),
+                    //         );
+                    //     }
+                    // }
+                    if let Some(path) = &file.path {
+                        // Check only for image files
+                        let bytes = read_file_bytes(path).unwrap();
+                        self.dropped_bytes.push(bytes);
+                        // let e_bytes = egui::load::Bytes::from(bytes);
+                        // let bytes: Arc<u8> = Arc::from(bytes);
                     }
                 }
             }
@@ -165,16 +178,13 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
         // CANVAS
         egui::CentralPanel::default().show(ctx, |ui| {
             let rect = ui.min_rect();
             self.manage_canvas_movement(ui);
 
-            // TEST button
             let window_layer = ui.layer_id();
-            self.test_button(ui, rect, window_layer);
-            self.test_image(ui, rect, window_layer);
+            // self.test_image(ui, rect, window_layer);
 
             for image in self.images.iter_mut() {
                 {
@@ -191,48 +201,25 @@ impl eframe::App for App {
                 ui.add(image);
             }
 
-            ui.input(|i| {
-                for event in i.events.iter() {
-                    if let egui::Event::Paste(string) = event {
-                        println!("{}", string);
-                    }
-                }
-            })
+            for (count, bytes) in self.dropped_bytes.iter().enumerate() {
+                // let widget = egui::Image::from_bytes(count, bytes);
+                let uri = format!("bytes://image_{}", count);
+                let e_bytes = egui::load::Bytes::from(bytes.clone());
+                let widget  = egui::Image::from_bytes(uri, e_bytes);
+
+                self.add_floating_widget(ui, rect, window_layer, widget, count);
+            }
+            
         });
 
         self.ui_file_drag_and_drop(ctx);
     }
 }
 
-// NOT NEEDED
-
-fn toggle_ui_compact(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
-    let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 1.0);
-    let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
-    if response.clicked() {
-        *on = !*on;
-        response.mark_changed();
-    }
-    response.widget_info(|| {
-        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), *on, "")
-    });
-
-    if ui.is_rect_visible(rect) {
-        let how_on = ui.ctx().animate_bool_responsive(response.id, *on);
-        let visuals = ui.style().interact_selectable(&response, *on);
-        let rect = rect.expand(visuals.expansion);
-        let radius = 0.5 * rect.height();
-        ui.painter()
-            .rect(rect, radius, visuals.bg_fill, visuals.bg_stroke);
-        let circle_x = egui::lerp((rect.left() + radius)..=(rect.right() - radius), how_on);
-        let center = egui::pos2(circle_x, rect.center().y);
-        ui.painter()
-            .circle(center, 0.75 * radius, visuals.bg_fill, visuals.fg_stroke);
-    }
-
-    response
-}
-
-pub fn toggle(on: &mut bool) -> impl egui::Widget + '_ {
-    move |ui: &mut egui::Ui| toggle_ui_compact(ui, on)
+fn read_file_bytes(file_path: &PathBuf) -> Result<Vec<u8>> {
+    let file = std::fs::File::open(file_path)?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer)?;
+    Ok(buffer)
 }
