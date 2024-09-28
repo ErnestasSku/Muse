@@ -1,7 +1,5 @@
-use std::path::PathBuf;
-
 use canvas_image::{canvas_image, CanvasImageData};
-use eframe::egui::{self, load::TextureLoader, DroppedFile, TextureOptions};
+use eframe::egui::{self};
 use egui::emath::TSTransform;
 
 mod canvas_image;
@@ -47,7 +45,13 @@ impl App {
     }
 
     fn manage_canvas_movement(&mut self, ui: &egui::Ui) {
+        // let a = UiBuilder
         let response = ui.interact_bg(egui::Sense::click_and_drag());
+        // let response = ui.response();
+        // let b = UiBuilder::new();
+
+        // b.
+        // let response = UiBuilder::sense(b, egui::Sense::click_and_drag());
 
         if response.dragged() {
             self.transform.translation += response.drag_delta();
@@ -71,6 +75,7 @@ impl App {
         }
     }
 
+    #[allow(dead_code)]
     fn test_image(&self, ui: &egui::Ui, rect: egui::Rect, parent_window: egui::LayerId) {
         let id = egui::Area::new(egui::Id::from("image"))
             .default_pos(egui::pos2(50.0, 50.0))
@@ -88,6 +93,7 @@ impl App {
         ui.ctx().set_sublayer(parent_window, id);
     }
 
+    #[allow(dead_code)]
     fn test_button(&self, ui: &egui::Ui, rect: egui::Rect, parent_window: egui::LayerId) {
         let id = egui::Area::new(egui::Id::from("toggle"))
             .default_pos(egui::pos2(0.0, 0.0))
@@ -112,7 +118,6 @@ impl App {
             let text = ctx.input(|i| {
                 let mut text = "Dropping files:\n".to_owned();
                 for file in &i.raw.hovered_files {
-                    println!("{:?}", file);
                     if let Some(path) = &file.path {
                         write!(text, "\n{}", path.display()).ok();
                     } else if !file.mime.is_empty() {
@@ -160,7 +165,6 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // println!("{:?}", info);
 
         // CANVAS
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -168,9 +172,9 @@ impl eframe::App for App {
             self.manage_canvas_movement(ui);
 
             // TEST button
-            // let window_layer = ui.layer_id();
-            // self.test_button(ui, rect, window_layer);
-            // self.test_image(ui, rect, window_layer);
+            let window_layer = ui.layer_id();
+            self.test_button(ui, rect, window_layer);
+            self.test_image(ui, rect, window_layer);
 
             for image in self.images.iter_mut() {
                 {
@@ -182,12 +186,18 @@ impl eframe::App for App {
                 ui.add(i);
             }
 
-
             for image in self.dropped_images.iter() {
-
                 let image = egui::Image::new(image);
                 ui.add(image);
             }
+
+            ui.input(|i| {
+                for event in i.events.iter() {
+                    if let egui::Event::Paste(string) = event {
+                        println!("{}", string);
+                    }
+                }
+            })
         });
 
         self.ui_file_drag_and_drop(ctx);

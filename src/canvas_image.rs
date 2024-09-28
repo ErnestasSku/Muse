@@ -1,4 +1,4 @@
-use eframe::egui::{self, ImageSource};
+use eframe::egui::{self};
 
 #[derive(Default)]
 pub struct CanvasImageData {
