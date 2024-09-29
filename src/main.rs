@@ -1,14 +1,16 @@
-use std::{io::Read, path::PathBuf, sync::Arc};
+use std::{io::Read, path::PathBuf, sync::mpsc, thread};
 
 use anyhow::{Ok, Result};
 use canvas_image::{canvas_image, CanvasImageData};
 use eframe::egui::{self, Widget};
 use egui::emath::TSTransform;
+use tracing_subscriber;
 
 mod canvas_image;
 
 fn main() -> eframe::Result {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    // env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    tracing_subscriber::fmt::init();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
         ..Default::default()
@@ -31,6 +33,7 @@ struct App {
     images: Vec<CanvasImageData>,
     dropped_images: Vec<String>,
     dropped_bytes: Vec<Vec<u8>>,
+    file_loader_channel: Option<mpsc::Receiver<Vec<u8>>>,
 }
 
 #[allow(dead_code)]
@@ -49,6 +52,10 @@ impl App {
     }
 
     fn manage_canvas_movement(&mut self, ui: &egui::Ui) {
+        // TODO: interact_bg is deprecated.
+        // TO get response, the UI needs to be built with UI Builder.
+        // Central panel does not accept UI builder.
+        #[allow(deprecated)]
         let response = ui.interact_bg(egui::Sense::click_and_drag());
 
         if response.dragged() {
@@ -101,7 +108,7 @@ impl App {
     ) {
         use egui::Id;
         let id = egui::Area::new(Id::new("floating_image").with(count))
-            // .default_pos()
+            // .default_pos() // TODO: figure out position later. Also WINIT does not send pointer move events when draging files.
             .order(egui::Order::Middle)
             .constrain(false)
             .show(ui.ctx(), |ui| {
@@ -117,6 +124,8 @@ impl App {
     }
 
     fn ui_file_drag_and_drop(&mut self, ctx: &egui::Context) {
+        // TODO:
+        // WINIT does not support dragging non files. Like images/text from things like browsers into the window.
         use egui::{Color32, Id, LayerId, Order, TextStyle};
         use std::fmt::Write as _;
 
@@ -149,26 +158,28 @@ impl App {
             );
         }
 
+        if let Some(receiver) = &self.file_loader_channel {
+            if let anyhow::Result::Ok(bytes) = receiver.try_recv() {
+                self.dropped_bytes.push(bytes);
+                self.file_loader_channel = None;
+            }
+        }
+
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
                 for file in &i.raw.dropped_files {
-                    // if let Some(file_path) = &file.path {
-                    //     if ["jpg", "svg", "gif"]
-                    //         .iter()
-                    //         .any(|f| file_path.extension().unwrap().to_str().unwrap().eq(*f))
-                    //     {
-                    //         self.dropped_images.push(
-                    //             String::from("file://")
-                    //                 + &file_path.clone().into_os_string().into_string().unwrap(),
-                    //         );
-                    //     }
-                    // }
                     if let Some(path) = &file.path {
-                        // Check only for image files
-                        let bytes = read_file_bytes(path).unwrap();
-                        self.dropped_bytes.push(bytes);
-                        // let e_bytes = egui::load::Bytes::from(bytes);
-                        // let bytes: Arc<u8> = Arc::from(bytes);
+                        let (sender, receiver) = mpsc::channel();
+                        self.file_loader_channel = Some(receiver);
+
+                        let path_clone = path.clone();
+                        thread::spawn(move || {
+                            if let anyhow::Result::Ok(bytes) = read_file_bytes(&path_clone) {
+                                sender.send(bytes).unwrap();
+                            } else {
+                                // TODO: failing cases.
+                            }
+                        });
                     }
                 }
             }
@@ -202,14 +213,12 @@ impl eframe::App for App {
             }
 
             for (count, bytes) in self.dropped_bytes.iter().enumerate() {
-                // let widget = egui::Image::from_bytes(count, bytes);
                 let uri = format!("bytes://image_{}", count);
                 let e_bytes = egui::load::Bytes::from(bytes.clone());
-                let widget  = egui::Image::from_bytes(uri, e_bytes);
+                let widget = egui::Image::from_bytes(uri, e_bytes);
 
                 self.add_floating_widget(ui, rect, window_layer, widget, count);
             }
-            
         });
 
         self.ui_file_drag_and_drop(ctx);
