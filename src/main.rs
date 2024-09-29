@@ -31,7 +31,6 @@ fn main() -> eframe::Result {
 struct App {
     transform: TSTransform,
     images: Vec<CanvasImageData>,
-    dropped_images: Vec<String>,
     dropped_bytes: Vec<Vec<u8>>,
     file_loader_channel: Option<mpsc::Receiver<Vec<u8>>>,
 }
@@ -80,24 +79,6 @@ impl App {
         }
     }
 
-    #[allow(dead_code)]
-    fn test_image(&self, ui: &egui::Ui, rect: egui::Rect, parent_window: egui::LayerId) {
-        let id = egui::Area::new(egui::Id::from("image"))
-            .default_pos(egui::pos2(50.0, 50.0))
-            .order(egui::Order::Middle)
-            .constrain(false)
-            .show(ui.ctx(), |ui| {
-                ui.set_clip_rect(self.transform.inverse() * rect);
-
-                ui.image(egui::include_image!("./ferris.gif"));
-            })
-            .response
-            .layer_id;
-
-        ui.ctx().set_transform_layer(id, self.transform);
-        ui.ctx().set_sublayer(parent_window, id);
-    }
-
     fn add_floating_widget(
         &self,
         ui: &egui::Ui,
@@ -135,16 +116,13 @@ impl App {
                 for file in &i.raw.hovered_files {
                     if let Some(path) = &file.path {
                         write!(text, "\n{}", path.display()).ok();
-                    } else if !file.mime.is_empty() {
-                        write!(text, "\n{}", file.mime).ok();
-                    } else {
-                        text += "\n???";
                     }
                 }
                 text
             });
 
             // Instead of this, we will paint image preview
+            // once again, this is not possible now due to winit limitation
             let painter =
                 ctx.layer_painter(LayerId::new(Order::Foreground, Id::new("file_drop_target")));
             let screen_rect = ctx.screen_rect();
@@ -192,10 +170,8 @@ impl eframe::App for App {
         // CANVAS
         egui::CentralPanel::default().show(ctx, |ui| {
             let rect = ui.min_rect();
-            self.manage_canvas_movement(ui);
-
             let window_layer = ui.layer_id();
-            // self.test_image(ui, rect, window_layer);
+            self.manage_canvas_movement(ui);
 
             for image in self.images.iter_mut() {
                 {
@@ -205,11 +181,6 @@ impl eframe::App for App {
 
                 let i = canvas_image(image);
                 ui.add(i);
-            }
-
-            for image in self.dropped_images.iter() {
-                let image = egui::Image::new(image);
-                ui.add(image);
             }
 
             for (count, bytes) in self.dropped_bytes.iter().enumerate() {
