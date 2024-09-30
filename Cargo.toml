@@ -5,7 +5,7 @@ edition = "2021"
 
 # For PC (native binary) and Android (dynamic library)
 [lib]
-crate_type=["lib", "cdylib"]
+crate-type=["lib", "cdylib"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -27,7 +27,6 @@ eframe = { version = "0.29", default-features = true }
 android_logger = { version = "0.14", default-features = false }
 eframe = { version = "0.29", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
 egui-winit = { version = "0.29", default-features = false, features = ["clipboard", "links"] }
-egui_demo_lib = "0.29"
 log = "0.4"
 
 # Release settings for optimized builds
