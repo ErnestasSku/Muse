@@ -8,8 +8,8 @@ use tracing_subscriber;
 
 mod canvas_image;
 
+#[cfg(not(target_os = "android"))]
 fn main() -> eframe::Result {
-    // env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     tracing_subscriber::fmt::init();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
