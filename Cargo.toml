@@ -5,16 +5,28 @@ edition = "2021"
 
 # For PC (native binary) and Android (dynamic library)
 [lib]
-crate-type=["lib", "cdylib"]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 anyhow = "1.0.89"
 eframe = { version = "0.29", features = ["default"] }
 egui_extras = { version = "0.29", features = ["default", "all_loaders"] }
 env_logger = "0.11.5"
+futures = "0.3.30"
 image = { version = "0.25.2", features = ["default-formats"] }
 itertools = "0.13.0"
+libp2p = { version = "0.54.1", features = [
+    "tokio",
+    "gossipsub",
+    "mdns",
+    "noise",
+    "macros",
+    "tcp",
+    "yamux",
+    "quic",
+] }
 resvg = "0.44.0"
+tokio = { version = "1.40.0", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
@@ -25,13 +37,20 @@ eframe = { version = "0.29", default-features = true }
 # Android-specific dependencies
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.14", default-features = false }
-eframe = { version = "0.29", default-features = false, features = ["wgpu", "android-native-activity", "default_fonts"] }
-egui-winit = { version = "0.29", default-features = false, features = ["clipboard", "links"] }
+eframe = { version = "0.29", default-features = false, features = [
+    "wgpu",
+    "android-native-activity",
+    "default_fonts",
+] }
+egui-winit = { version = "0.29", default-features = false, features = [
+    "clipboard",
+    "links",
+] }
 log = "0.4"
 
 # Release settings for optimized builds
 [profile.release]
-strip = true  # Strip symbols from the binary to reduce size
-opt-level = "z"  # Optimize for size
-lto = true  # Enable link-time optimization
+strip = true      # Strip symbols from the binary to reduce size
+opt-level = "z"   # Optimize for size
+lto = true        # Enable link-time optimization
 codegen-units = 1
