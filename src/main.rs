@@ -1,16 +1,22 @@
-use std::{io::Read, path::PathBuf, sync::mpsc, thread};
+use std::{sync::mpsc, thread};
 
-use anyhow::{Ok, Result};
-use canvas_image::{canvas_image, CanvasImageData};
-use eframe::egui::{self, Widget};
-use egui::emath::TSTransform;
+use eframe::egui::{self};
+
 use tracing_subscriber;
 
-mod canvas_image;
 mod canvas_app;
+mod canvas_image;
+mod p2p;
 
 #[cfg(not(target_os = "android"))]
 fn main() -> eframe::Result {
+    // P2P
+    let _p2p_thread = thread::spawn(|| {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(p2p::p2p());
+    });
+
+    // App
     tracing_subscriber::fmt::init();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([800.0, 600.0]),
