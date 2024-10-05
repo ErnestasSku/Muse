@@ -1,23 +1,30 @@
-use crate::canvas_image::{canvas_image, CanvasImageData};
-use std::{io::Read, path::PathBuf, sync::mpsc, thread};
-
+use crate::{
+    canvas_image::{canvas_image, CanvasImageData},
+    communication::{MessageType, SyncableState},
+};
 use anyhow::{Ok, Result};
 use eframe::egui::{self, include_image, Widget};
 use egui::emath::TSTransform;
+use std::{io::Read, path::PathBuf, thread};
+
+use tokio::sync::mpsc;
+// use std::sync::mpsc;
 
 #[derive(Default)]
 pub struct App {
-    transform: TSTransform,
-    images: Vec<CanvasImageData>,
-    dropped_bytes: Vec<Vec<u8>>,
-    file_loader_channel: Option<mpsc::Receiver<Vec<u8>>>,
+    pub transform: TSTransform,
+    pub images: Vec<CanvasImageData>,
+    pub dropped_bytes: Vec<Vec<u8>>,
+    pub file_loader_channel: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
+    pub p2p_receiver: Option<mpsc::Receiver<MessageType>>,
+    pub gui_sender: Option<mpsc::Sender<MessageType>>,
 }
 
 impl App {
     pub fn new() -> Self {
         Self {
             transform: TSTransform::default(),
-            images: vec![CanvasImageData::new()],
+            images: vec![],
             ..Default::default()
         }
     }
@@ -119,7 +126,7 @@ impl App {
             if !i.raw.dropped_files.is_empty() {
                 for file in &i.raw.dropped_files {
                     if let Some(path) = &file.path {
-                        let (sender, receiver) = mpsc::channel();
+                        let (sender, receiver) = std::sync::mpsc::channel();
                         self.file_loader_channel = Some(receiver);
 
                         let path_clone = path.clone();
@@ -135,6 +142,31 @@ impl App {
             }
         })
     }
+
+    pub fn send_state(&self) {
+        if let Some(sender) = &self.gui_sender {
+            let _a = sender
+                .try_send(MessageType::CanvasState {
+                    state: SyncableState::from(self),
+                })
+                .map_err(|err| println!("{:?}", err));
+        }
+    }
+
+    pub fn handle_p2p_messages(&mut self) {
+        if let Some(ref mut p2p) = self.p2p_receiver {
+            if let anyhow::Result::Ok(message) = p2p.try_recv() {
+                println!("Houston, UI has the message");
+                match message {
+                    MessageType::NewImage { bytes } => todo!(),
+                    MessageType::CanvasState { state } => {
+                        println!("overwriting state");
+                        self.dropped_bytes = state.dropped_bytes.clone();
+                    },
+                }
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -145,9 +177,8 @@ impl eframe::App for App {
             let window_layer = ui.layer_id();
             self.manage_canvas_movement(ui);
 
-            
-            let img = egui::Image::new(include_image!("./ferris.gif"));
-            self.add_floating_widget(ui, rect, window_layer, img, 150);
+            // let img = egui::Image::new(include_image!("./ferris.gif"));
+            // self.add_floating_widget(ui, rect, window_layer, img, 150);
 
             for image in self.images.iter_mut() {
                 {
@@ -166,9 +197,15 @@ impl eframe::App for App {
 
                 self.add_floating_widget(ui, rect, window_layer, widget, count);
             }
+
+            if ui.add(egui::Button::new("Send state")).clicked() {
+                println!("clicked");
+                self.send_state();
+            }
         });
 
         self.ui_file_drag_and_drop(ctx);
+        self.handle_p2p_messages();
     }
 }
 
