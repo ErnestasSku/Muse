@@ -170,11 +170,11 @@ impl App {
     pub fn handle_p2p_messages(&mut self) {
         if let Some(ref mut p2p) = self.p2p_receiver {
             if let anyhow::Result::Ok(message) = p2p.try_recv() {
-                println!("Houston, UI has the message");
                 match message {
-                    MessageType::NewImage { bytes } => todo!(),
+                    MessageType::NewImage { bytes } => {
+                        self.dropped_bytes.push(bytes);
+                    },
                     MessageType::CanvasState { state } => {
-                        println!("overwriting state");
                         self.dropped_bytes = state.dropped_bytes.clone();
                     }
                 }
@@ -254,7 +254,6 @@ impl eframe::App for App {
             }
 
             if ui.add(egui::Button::new("Send state")).clicked() {
-                println!("clicked");
                 self.send_state();
             }
         });

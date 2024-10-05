@@ -108,7 +108,6 @@ pub async fn p2p(
                 })) => {
                     let deserialized: Result<MessageType, _> = bincode::deserialize(&message.data);
 
-                    println!("Got message and deserialised");
                     if let Ok(msg) = deserialized {
                         // TODO: figure out how would error handling even work in this case
                         let _result = p2p_sender.send(msg).await;
@@ -122,11 +121,9 @@ pub async fn p2p(
             Some(message) = gui_receiver.recv() => {
                 let serialized_message = bincode::serialize(&message).expect("failed to serialise");
 
-                println!("SENDING FROM P2P");
                 if let Err(e) = swarm
                     .behaviour_mut().gossipsub
                     .publish(topic.clone(), serialized_message) {
-                    println!("Publish error: {e:?}");
                 }
             }
         }

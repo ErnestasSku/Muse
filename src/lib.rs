@@ -3,7 +3,7 @@ mod canvas_app;
 #[cfg(target_os = "android")]
 mod canvas_image;
 
-
+#[cfg(target_os = "android")]
 use eframe::{egui, NativeOptions};
 
 #[cfg(target_os = "android")]
