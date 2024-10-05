@@ -8,7 +8,9 @@ use tokio::{io, select};
 use bincode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::canvas_state_sync::communication::MessageType;
+use crate::canvas_state_sync::sync_types::MessageType;
+
+const MAX_DATA_TRANSFER_SIZE: usize = 1024*1024;
 
 #[derive(NetworkBehaviour)]
 pub struct TestBehavior {
@@ -49,6 +51,7 @@ pub async fn p2p(
                 .heartbeat_interval(Duration::from_secs(10))
                 .validation_mode(gossipsub::ValidationMode::Strict)
                 .message_id_fn(message_id_fn)
+                .max_transmit_size(MAX_DATA_TRANSFER_SIZE)
                 .build()
                 .map_err(|msg| io::Error::new(io::ErrorKind::Other, msg))
                 .unwrap();
@@ -65,7 +68,7 @@ pub async fn p2p(
             Ok(TestBehavior { gossipsub, mdns })
         })
         .unwrap()
-        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(240)))
+        .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(60)))
         .build();
 
     let topic = gossipsub::IdentTopic::new("test-net");
@@ -85,7 +88,6 @@ pub async fn p2p(
         }
         
         select! {
-
             event = swarm.select_next_some() => match event {
                 SwarmEvent::Behaviour(TestBehaviorEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
@@ -100,15 +102,16 @@ pub async fn p2p(
                     }
                 },
                 SwarmEvent::Behaviour(TestBehaviorEvent::Gossipsub(gossipsub::Event::Message {
-                    propagation_source: peer_id,
-                    message_id: id,
+                    propagation_source: _peer_id,
+                    message_id: _id,
                     message,
                 })) => {
                     let deserialized: Result<MessageType, _> = bincode::deserialize(&message.data);
 
                     println!("Got message and deserialised");
                     if let Ok(msg) = deserialized {
-                        let result = p2p_sender.send(msg).await;
+                        // TODO: figure out how would error handling even work in this case
+                        let _result = p2p_sender.send(msg).await;
                     }
                 }
                 SwarmEvent::NewListenAddr { address, .. } => {

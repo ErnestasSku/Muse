@@ -10,11 +10,11 @@ use crate::canvas_app::App;
 pub enum MessageType {
     NewImage { bytes: Vec<u8> },
     CanvasState { state: SyncableState },
-    // 
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct SyncableState {
+    // TSTransfor does not derive Ser/Deser.
     // transform : Option<TSTransform>,
     // images: Vec<CanvasImageData>,
     pub dropped_bytes: Vec<Vec<u8>>,

@@ -1,7 +1,7 @@
 use crate::{
     canvas_image::{canvas_image, CanvasImageData},
     canvas_state_sync::{
-        communication::{MessageType, SyncableState},
+        sync_types::{MessageType, SyncableState},
         p2p,
     },
 };
