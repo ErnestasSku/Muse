@@ -1,10 +1,10 @@
 use futures::stream::StreamExt;
 use libp2p::{gossipsub, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux};
-use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::{io, select};
-// use std::sync::mpsc;
 use bincode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -19,6 +19,7 @@ pub struct TestBehavior {
 pub async fn p2p(
     mut gui_receiver: mpsc::Receiver<MessageType>,
     p2p_sender: mpsc::Sender<MessageType>,
+    running: Arc<AtomicBool>
 ) {
     let mut swarm = libp2p::SwarmBuilder::with_new_identity()
         .with_tokio()
@@ -79,14 +80,12 @@ pub async fn p2p(
         .unwrap();
 
     loop {
+        if !running.load(Ordering::Relaxed) {
+            break;
+        }
+        
         select! {
-            // Ok(Some(line)) = stdin.next_line() => {
-            //     if let Err(e) = swarm
-            //         .behaviour_mut().gossipsub
-            //         .publish(topic.clone(), line.as_bytes()) {
-            //         println!("Publish error: {e:?}");
-            //     }
-            // },
+
             event = swarm.select_next_some() => match event {
                 SwarmEvent::Behaviour(TestBehaviorEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
@@ -117,15 +116,7 @@ pub async fn p2p(
                 }
                 _ => {}
             },
-            // Forgot we need to send the message to p2p, and receive it from it
             Some(message) = gui_receiver.recv() => {
-                // match message {
-                //     MessageType::NewImage { bytes } => todo!(),
-                //     MessageType::CanvasState { state } => {
-                //         if let Err(e) = swarm
-                //             .behaviour_mut().gossipsub
-                //             .publish
-                //     },
                 let serialized_message = bincode::serialize(&message).expect("failed to serialise");
 
                 println!("SENDING FROM P2P");

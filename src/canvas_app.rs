@@ -1,11 +1,22 @@
 use crate::{
     canvas_image::{canvas_image, CanvasImageData},
-    canvas_state_sync::communication::{MessageType, SyncableState},
+    canvas_state_sync::{
+        communication::{MessageType, SyncableState},
+        p2p,
+    },
 };
 use anyhow::{Ok, Result};
 use eframe::egui::{self, include_image, Widget};
 use egui::emath::TSTransform;
-use std::{io::Read, path::PathBuf, sync::{atomic::AtomicBool, Arc}, thread};
+use std::{
+    io::Read,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+};
 
 use tokio::sync::mpsc;
 
@@ -15,7 +26,7 @@ pub struct App {
     pub images: Vec<CanvasImageData>,
     pub dropped_bytes: Vec<Vec<u8>>,
     pub file_loader_channel: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
-    
+
     // p2p communication fields
     pub p2p_receiver: Option<mpsc::Receiver<MessageType>>,
     pub gui_sender: Option<mpsc::Sender<MessageType>>,
@@ -165,15 +176,56 @@ impl App {
                     MessageType::CanvasState { state } => {
                         println!("overwriting state");
                         self.dropped_bytes = state.dropped_bytes.clone();
-                    },
+                    }
                 }
             }
+        }
+    }
+
+    pub fn start_network_sync(&mut self) {
+        if self.p2p_running.load(Ordering::Relaxed) {
+            return;
+        }
+
+        self.p2p_running.store(true, Ordering::Relaxed);
+
+        let (gui_sender, gui_receiver) = mpsc::channel::<MessageType>(1);
+        let (p2p_sender, p2p_receiver) = mpsc::channel::<MessageType>(1);
+        let p2p_running = Arc::clone(&self.p2p_running);
+
+        self.p2p_receiver = Some(p2p_receiver);
+        self.gui_sender = Some(gui_sender);
+
+        let handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(p2p::p2p(gui_receiver, p2p_sender, p2p_running));
+        });
+
+        self.p2p_thread_handle = Some(handle);
+    }
+
+    pub fn stop_network_sync(&mut self) {
+        if !self.p2p_running.load(Ordering::Relaxed) {
+            return;
+        }
+
+        self.p2p_running.store(false, Ordering::Relaxed);
+
+        self.p2p_receiver = None;
+        self.gui_sender = None;
+
+        if let Some(handle) = self.p2p_thread_handle.take() {
+            handle.join().unwrap();
         }
     }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // TODO: this should be behind a toggle in the UI.
+        // For now it always starts the p2p sync on run.
+        self.start_network_sync();
+        
         // CANVAS
         egui::CentralPanel::default().show(ctx, |ui| {
             let rect = ui.min_rect();
