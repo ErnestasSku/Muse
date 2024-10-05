@@ -1,15 +1,14 @@
 use futures::stream::StreamExt;
 use libp2p::{gossipsub, mdns, noise, swarm::NetworkBehaviour, swarm::SwarmEvent, tcp, yamux};
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio::{io, io::AsyncBufReadExt, select};
+use tokio::{io, select};
 // use std::sync::mpsc;
 use bincode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::communication::MessageType;
+use crate::canvas_state_sync::communication::MessageType;
 
 #[derive(NetworkBehaviour)]
 pub struct TestBehavior {
@@ -31,11 +30,9 @@ pub async fn p2p(
         .unwrap()
         .with_quic()
         .with_behaviour(|key| {
-            let message_id_fn = |message: &gossipsub::Message| {
-                // let mut s = DefaultHasher::new();
-                // message.data.hash(&mut s);
-                // gossipsub::MessageId::from(s.finish().to_string())
-                // Get the current time as a duration since the UNIX epoch
+            let message_id_fn = |_message: &gossipsub::Message| {
+                // Note: Maybe the message should be used for the ID generation, but we'll see in the future.
+                // This seems to work for now
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .expect("Time went backwards");
@@ -73,7 +70,7 @@ pub async fn p2p(
     let topic = gossipsub::IdentTopic::new("test-net");
     swarm.behaviour_mut().gossipsub.subscribe(&topic).unwrap();
 
-    let mut stdin = io::BufReader::new(io::stdin()).lines();
+    // let mut stdin = io::BufReader::new(io::stdin()).lines();
     swarm
         .listen_on("/ip4/0.0.0.0/udp/0/quic-v1".parse().unwrap())
         .unwrap();
@@ -81,17 +78,15 @@ pub async fn p2p(
         .listen_on("/ip4/0.0.0.0/tcp/0".parse().unwrap())
         .unwrap();
 
-    // let a = gui_receiver.recv();
-
     loop {
         select! {
-            Ok(Some(line)) = stdin.next_line() => {
-                if let Err(e) = swarm
-                    .behaviour_mut().gossipsub
-                    .publish(topic.clone(), line.as_bytes()) {
-                    println!("Publish error: {e:?}");
-                }
-            },
+            // Ok(Some(line)) = stdin.next_line() => {
+            //     if let Err(e) = swarm
+            //         .behaviour_mut().gossipsub
+            //         .publish(topic.clone(), line.as_bytes()) {
+            //         println!("Publish error: {e:?}");
+            //     }
+            // },
             event = swarm.select_next_some() => match event {
                 SwarmEvent::Behaviour(TestBehaviorEvent::Mdns(mdns::Event::Discovered(list))) => {
                     for (peer_id, _multiaddr) in list {
@@ -115,34 +110,7 @@ pub async fn p2p(
                     println!("Got message and deserialised");
                     if let Ok(msg) = deserialized {
                         let result = p2p_sender.send(msg).await;
-                        println!("Message is send back to gui");
                     }
-
-                    // match deserialized {
-                    //     Ok(message) => {
-                    //         match message {
-                    //             MessageType::NewImage { bytes } => {
-                    //                 println!("Received an image with {} bytes", bytes.len());
-                    //             }
-                    //             MessageType::CanvasState { state } => {
-                    //                 // println!("Received a canvas state: {:?}", state);
-                    //                 p2p_sender.send(value)
-                    //             }
-                    //             // MessageType::ConnectionRequest { msg } => {
-                    //             //     println!("Received a connection request: {}", msg);
-                    //             // }
-                    //             // MessageType::ConnectionResponse { msg, connection_accepted } => {
-                    //             //     println!(
-                    //             //         "Received a connection response: {}, accepted: {}",
-                    //             //         msg, connection_accepted
-                    //             //     );
-                    //             // }
-                    //         }
-                    //     }
-                    //     Err(e) => {
-                    //         println!("Failed to deserialize message: {:?}", e);
-                    //     }
-                    // }
                 }
                 SwarmEvent::NewListenAddr { address, .. } => {
                     println!("Local node is listening on {address}");
@@ -167,10 +135,6 @@ pub async fn p2p(
                     println!("Publish error: {e:?}");
                 }
             }
-
-            // Ok(message) = gui_receiver => {
-                //
-            // }
         }
     }
 }

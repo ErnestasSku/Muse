@@ -9,13 +9,13 @@ use tracing_subscriber;
 
 mod canvas_app;
 mod canvas_image;
-mod communication;
-mod p2p;
+mod canvas_state_sync;
 
 #[cfg(not(target_os = "android"))]
 fn main() -> eframe::Result {
     // Channels
 
+    use canvas_state_sync::{communication, p2p};
     use communication::MessageType;
     let (gui_sender, gui_receiver) = mpsc::channel::<MessageType>(1);
     let (p2p_sender, p2p_receiver) = mpsc::channel::<MessageType>(1);

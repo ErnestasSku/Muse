@@ -1,14 +1,13 @@
 use crate::{
     canvas_image::{canvas_image, CanvasImageData},
-    communication::{MessageType, SyncableState},
+    canvas_state_sync::communication::{MessageType, SyncableState},
 };
 use anyhow::{Ok, Result};
 use eframe::egui::{self, include_image, Widget};
 use egui::emath::TSTransform;
-use std::{io::Read, path::PathBuf, thread};
+use std::{io::Read, path::PathBuf, sync::{atomic::AtomicBool, Arc}, thread};
 
 use tokio::sync::mpsc;
-// use std::sync::mpsc;
 
 #[derive(Default)]
 pub struct App {
@@ -16,8 +15,12 @@ pub struct App {
     pub images: Vec<CanvasImageData>,
     pub dropped_bytes: Vec<Vec<u8>>,
     pub file_loader_channel: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
+    
+    // p2p communication fields
     pub p2p_receiver: Option<mpsc::Receiver<MessageType>>,
     pub gui_sender: Option<mpsc::Sender<MessageType>>,
+    pub p2p_running: Arc<AtomicBool>,
+    pub p2p_thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl App {
