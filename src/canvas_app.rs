@@ -175,7 +175,7 @@ impl App {
                         self.dropped_bytes.push(bytes);
                     },
                     MessageType::CanvasState { state } => {
-                        self.dropped_bytes = state.dropped_bytes.clone();
+                        self.dropped_bytes = state.dropped_bytes;
                     }
                 }
             }
