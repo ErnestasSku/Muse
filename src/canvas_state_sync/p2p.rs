@@ -1,4 +1,4 @@
-use bincode::{self, deserialize};
+use bincode::{self};
 use futures::stream::StreamExt;
 use libp2p::gossipsub::IdentTopic;
 use libp2p::Swarm;
@@ -132,13 +132,6 @@ async fn handle_swarm_event(
             message_id: _id,
             message,
         })) => {
-            // let deserialized: Result<MessageType, _> = bincode::deserialize(&message.data);
-            //
-            // if let Ok(msg) = deserialized {
-            // TODO: figure out how would error handling even work in this case
-            // let _result = p2p_sender.send(msg).await;
-            // }
-
             let deserialized_chunk: Result<ChunkedMessage, _> = bincode::deserialize(&message.data);
 
             if let Ok(ChunkedMessage {
@@ -151,8 +144,7 @@ async fn handle_swarm_event(
                 chunk_collector.add_chunk(id, chunk_index, total_chunks, data);
 
                 // If the message is complete, reassemble it
-                // TODO: this can cause issues possibly. After reassemlbing the message
-                // It needs to be removed from memory.
+                // When message is reassembled, it should be removed from memory.
                 // What happens if message is never reassembled?
                 if chunk_collector.is_complete(id) {
                     if let Some(full_message) = chunk_collector.reassemble(id) {
@@ -160,7 +152,6 @@ async fn handle_swarm_event(
                             bincode::deserialize(&full_message);
                         if let Ok(msg) = deserialized_message {
                             println!("Full message reassembled and deserialized");
-                            // Handle the full message, e.g., send to GUI
                             let result = p2p_sender.send(msg).await;
                             println!("Message sent back to GUI");
                         }
@@ -196,8 +187,6 @@ fn handle_sending(swarm: &mut Swarm<TestBehavior>, topic: &IdentTopic, message: 
         let serialized_chunk =
             bincode::serialize(&chunk_message).expect("Failed to serialize chunk");
 
-        // println!("{}", std::mem::size_of_val(&serialized_chunk));
-        println!("{}", serialized_chunk.len());
 
         if let Err(e) = swarm
             .behaviour_mut()
@@ -205,14 +194,6 @@ fn handle_sending(swarm: &mut Swarm<TestBehavior>, topic: &IdentTopic, message: 
             .publish(topic.clone(), serialized_chunk)
         {
             println!("Publish error: {e:?}");
-            println!("{}", MAX_DATA_TRANSFER_SIZE);
         }
     }
-
-    // if let Err(e) = swarm
-    //     .behaviour_mut()
-    //     .gossipsub
-    //     .publish(topic.clone(), serialized_message) {
-    //         println!("error publishing the message");
-    //     }
 }

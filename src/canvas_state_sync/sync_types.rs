@@ -47,7 +47,7 @@ impl ChunkCollector {
         false
     }
 
-    pub fn reassemble(&self, id: u64) -> Option<Vec<u8>> {
+    pub fn reassemble(&mut self, id: u64) -> Option<Vec<u8>> {
         if self.is_complete(id) {
             let chunk_list = self.chunks.get(&id).unwrap();
             let mut message_data = Vec::new();
@@ -56,6 +56,8 @@ impl ChunkCollector {
                     message_data.extend_from_slice(&data);
                 }
             }
+            self.chunks.remove(&id);
+            self.chunk_sizes.remove(&id);
             return Some(message_data);
         }
         None
