@@ -7,16 +7,11 @@ Image reference app for desktop and mobile.
 It can load images by dragging them. (Images must be files on the system).
 It is possible to manually sync state between different applications.
 
-## Road to MVP
+## MVP
 
-- [x] Working desktop client
-- [x] Working android client
-- [x] Dragging files into desktop client
-- [x] P2P or other kind of communication between clients
-- [ ] [BONUS] Improved image widget
-  - [ ] Selected outline (with edge bubbles)
-  - [ ] Resizing/Scaling
-  - [ ] Rotation
+Working desktop and android application.
+Can drag images from desktop to application.
+Can sync state between different clients. (Done manually)
 
 ### Nice to have/Blocked:
 
@@ -37,3 +32,7 @@ This is currently not doable due to winit's limitation.
 - [ ] Remove unsafety:
   - [ ] Implement a Toast/Notification widget for error reporting
   - [ ] Instead of unwraping results, use the widget to report errors
+- [ ] Improved image widget
+  - [ ] Selected outline (with edge bubbles)
+  - [ ] Resizing/Scaling
+  - [ ] Rotation
