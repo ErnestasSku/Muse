@@ -38,6 +38,7 @@ pub struct App {
 
     // Panel
     pub show_menu_panel: bool,
+    pub menu_p2p_enabled: bool,
 }
 
 impl App {
@@ -220,18 +221,16 @@ impl App {
 
         self.p2p_receiver = None;
         self.gui_sender = None;
-
-        if let Some(handle) = self.p2p_thread_handle.take() {
-            handle.join().unwrap();
-        }
     }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // TODO: this should be behind a toggle in the UI.
-        // For now it always starts the p2p sync on run.
-        self.start_network_sync();
+        if self.menu_p2p_enabled {
+            self.start_network_sync();
+        } else {
+            self.stop_network_sync();
+        }
 
         TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -248,8 +247,22 @@ impl eframe::App for App {
 
                 Grid::new("menu_grid").show(ui, |ui| {
                     ui.label("P2P server");
-                    ui.add(toggle(&mut false));
+                    ui.add(toggle(&mut self.menu_p2p_enabled));
                     ui.end_row();
+
+                    // TODO: P2P status here
+                    // ui.label("P2P status");
+                    // ui.painter().circle(
+                        // (0.0, 0.0).into(),
+                        // 20.0,
+                        // if self.p2p_running.load(Ordering::Relaxed) {
+                            // egui::Color32::GREEN
+                        // } else {
+                            // egui::Color32::RED
+                        // },
+                        // egui::Stroke::new(1.0, egui::Color32::BLACK),
+                    // );
+                    // ui.end_row();
 
                     ui.label("Manual state sync");
                     if ui.add(egui::Button::new("Send state")).clicked() {
