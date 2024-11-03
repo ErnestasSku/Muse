@@ -1,11 +1,8 @@
-// use eframe::egui::ahash::HashMap;
 use std::collections::HashMap;
-// use eframe::emath::TSTransform;
 use serde::{Deserialize, Serialize};
 
 use crate::canvas_app::App;
 
-// use crate::canvas_image::CanvasImageData;
 
 #[derive(Serialize, Deserialize)]
 pub struct ChunkedMessage {
@@ -16,8 +13,9 @@ pub struct ChunkedMessage {
 }
 
 pub struct ChunkCollector {
-    chunks: HashMap<u64, Vec<Option<Vec<u8>>>>, // Mapping message ID -> list of chunks
-    chunk_sizes: HashMap<u64, u32>,             // Mapping message ID -> total number of chunks
+    chunks: HashMap<u64, Vec<Option<Vec<u8>>>>,       // Mapping message ID -> list of chunks
+    chunk_sizes: HashMap<u64, u32>,                   // Mapping message ID -> total number of chunks
+    pub chunk_times: HashMap<u64, std::time::SystemTime>  // Mapping message ID -> TimeStamp of the message
 }
 
 impl ChunkCollector {
@@ -25,12 +23,20 @@ impl ChunkCollector {
         ChunkCollector {
             chunks: HashMap::new(),
             chunk_sizes: HashMap::new(),
+            chunk_times: HashMap::new(),
         }
+    }
+
+    pub fn remove_chunks(&mut self, id: &u64) {
+        self.chunks.remove(id);
+        self.chunk_sizes.remove(id);
+        self.chunk_times.remove(id);
     }
 
     pub fn add_chunk(&mut self, id: u64, chunk_index: u32, total_chunks: u32, data: Vec<u8>) {
         // If it's a new message, initialize storage
         self.chunk_sizes.entry(id).or_insert(total_chunks);
+        self.chunk_times.entry(id).or_insert(std::time::SystemTime::now());
         let chunk_list = self
             .chunks
             .entry(id)
@@ -56,8 +62,8 @@ impl ChunkCollector {
                     message_data.extend_from_slice(&data);
                 }
             }
-            self.chunks.remove(&id);
-            self.chunk_sizes.remove(&id);
+
+            self.remove_chunks(&id);
             return Some(message_data);
         }
         None

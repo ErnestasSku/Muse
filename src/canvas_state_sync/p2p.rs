@@ -101,6 +101,9 @@ pub async fn p2p(
             Some(message) = gui_receiver.recv() => {
                 handle_sending(&mut swarm, &topic, &message);
             }
+            _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                clear_outdated_chunks(&mut chunk_collector);
+            }
         }
     }
 }
@@ -187,7 +190,6 @@ fn handle_sending(swarm: &mut Swarm<TestBehavior>, topic: &IdentTopic, message: 
         let serialized_chunk =
             bincode::serialize(&chunk_message).expect("Failed to serialize chunk");
 
-
         if let Err(e) = swarm
             .behaviour_mut()
             .gossipsub
@@ -196,4 +198,25 @@ fn handle_sending(swarm: &mut Swarm<TestBehavior>, topic: &IdentTopic, message: 
             println!("Publish error: {e:?}");
         }
     }
+}
+
+fn clear_outdated_chunks(chunk_collector: &mut ChunkCollector) {
+    let now = SystemTime::now();
+    let delete_duration = Duration::from_secs(5);
+
+    let mut ids_to_remove = vec![];
+    for (id, time) in chunk_collector.chunk_times.iter() {
+        let time_elapesed = now.duration_since(*time);
+
+        match time_elapesed {
+            Ok(time) => {
+                if time > delete_duration {
+                    ids_to_remove.push(id.to_owned());
+                }
+            }
+            Err(_) => ids_to_remove.push(id.to_owned()),
+        }
+    }
+
+    let _ = ids_to_remove.iter().map(|id| chunk_collector.remove_chunks(id));
 }
