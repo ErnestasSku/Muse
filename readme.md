@@ -27,7 +27,7 @@ This is currently not doable due to winit's limitation.
   - [ ] Next/Previous frame functionality
   - [ ] Frame preview
 - [ ] Improve UI
-- [ ] Allow to enable/disable syncing from the UI
+  - [x] Allow to enable/disable syncing from the UI
 - [ ] Implement automatic image sharing between clients
 - [ ] Remove unsafety:
   - [ ] Implement a Toast/Notification widget for error reporting

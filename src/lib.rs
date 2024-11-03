@@ -2,7 +2,6 @@
 mod canvas_app;
 #[cfg(target_os = "android")]
 mod custom_widgets;
-
 #[cfg(target_os = "android")]
 mod canvas_state_sync;
 
