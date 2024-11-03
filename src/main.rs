@@ -3,7 +3,7 @@ use eframe::egui::{self};
 use tracing_subscriber;
 
 mod canvas_app;
-mod canvas_image;
+mod custom_widgets;
 mod canvas_state_sync;
 
 #[cfg(not(target_os = "android"))]

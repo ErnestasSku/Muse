@@ -1,12 +1,15 @@
 use crate::{
-    canvas_image::{canvas_image, CanvasImageData},
     canvas_state_sync::{
-        sync_types::{MessageType, SyncableState},
         p2p,
+        sync_types::{MessageType, SyncableState},
+    },
+    custom_widgets::{
+        canvas_image::{canvas_image, CanvasImageData},
+        toggle::toggle,
     },
 };
 use anyhow::{Ok, Result};
-use eframe::egui::{self, include_image, Widget};
+use eframe::egui::{self, include_image, Grid, SidePanel, TopBottomPanel, Widget};
 use egui::emath::TSTransform;
 use std::{
     io::Read,
@@ -32,6 +35,9 @@ pub struct App {
     pub gui_sender: Option<mpsc::Sender<MessageType>>,
     pub p2p_running: Arc<AtomicBool>,
     pub p2p_thread_handle: Option<std::thread::JoinHandle<()>>,
+
+    // Panel
+    pub show_menu_panel: bool,
 }
 
 impl App {
@@ -136,22 +142,23 @@ impl App {
             }
         }
 
+        // TODO: improve this code.
+        // read_file_bytes does not cover failing case.
+        // If a file is not image, weird things might happen, since non images are also not handled.
         ctx.input(|i| {
-            if !i.raw.dropped_files.is_empty() {
-                for file in &i.raw.dropped_files {
-                    if let Some(path) = &file.path {
-                        let (sender, receiver) = std::sync::mpsc::channel();
-                        self.file_loader_channel = Some(receiver);
+            for file in &i.raw.dropped_files {
+                if let Some(path) = &file.path {
+                    let (sender, receiver) = std::sync::mpsc::channel();
+                    self.file_loader_channel = Some(receiver);
 
-                        let path_clone = path.clone();
-                        thread::spawn(move || {
-                            if let anyhow::Result::Ok(bytes) = read_file_bytes(&path_clone) {
-                                sender.send(bytes).unwrap();
-                            } else {
-                                // TODO: failing cases.
-                            }
-                        });
-                    }
+                    let path_clone = path.clone();
+                    thread::spawn(move || {
+                        if let anyhow::Result::Ok(bytes) = read_file_bytes(&path_clone) {
+                            sender.send(bytes).unwrap();
+                        } else {
+                            // TODO: failing cases.
+                        }
+                    });
                 }
             }
         })
@@ -173,7 +180,7 @@ impl App {
                 match message {
                     MessageType::NewImage { bytes } => {
                         self.dropped_bytes.push(bytes);
-                    },
+                    }
                     MessageType::CanvasState { state } => {
                         self.dropped_bytes = state.dropped_bytes;
                     }
@@ -225,22 +232,41 @@ impl eframe::App for App {
         // TODO: this should be behind a toggle in the UI.
         // For now it always starts the p2p sync on run.
         self.start_network_sync();
-        
+
+        TopBottomPanel::top("top_panel").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("Menu").clicked() {
+                    self.show_menu_panel = !self.show_menu_panel;
+                }
+            })
+        });
+
+        if self.show_menu_panel {
+            SidePanel::left("menu_panel").show(ctx, |ui| {
+                ui.heading("Menu");
+                ui.separator();
+
+                Grid::new("menu_grid").show(ui, |ui| {
+                    ui.label("P2P server");
+                    ui.add(toggle(&mut false));
+                    ui.end_row();
+
+                    ui.label("Manual state sync");
+                    if ui.add(egui::Button::new("Send state")).clicked() {
+                        self.send_state();
+                    }
+                    ui.end_row();
+                })
+            });
+        }
+
         // CANVAS
         egui::CentralPanel::default().show(ctx, |ui| {
             let rect = ui.min_rect();
             let window_layer = ui.layer_id();
             self.manage_canvas_movement(ui);
 
-            // let img = egui::Image::new(include_image!("./ferris.gif"));
-            // self.add_floating_widget(ui, rect, window_layer, img, 150);
-
             for image in self.images.iter_mut() {
-                {
-                    // image.x += 1.0;
-                    // image.y += 1.0;
-                }
-
                 let i = canvas_image(image);
                 ui.add(i);
             }
@@ -251,10 +277,6 @@ impl eframe::App for App {
                 let widget = egui::Image::from_bytes(uri, e_bytes);
 
                 self.add_floating_widget(ui, rect, window_layer, widget, count);
-            }
-
-            if ui.add(egui::Button::new("Send state")).clicked() {
-                self.send_state();
             }
         });
 

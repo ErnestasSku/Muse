@@ -23,7 +23,7 @@ impl CanvasImageData {
 
 fn canvas_image_component(ui: &mut egui::Ui, data: &mut CanvasImageData) -> egui::Response {
     // let img = egui::Image::new(a.as_bytes());
-    let image = egui::Image::new(egui::include_image!("./ferris.gif"));
+    let image = egui::Image::new(egui::include_image!(".././ferris.gif"));
     // let image = image.fit_to_exact_size([data.x, data.y].into());
 
     let add = ui.add_sized([data.position.x, data.position.y], image);
